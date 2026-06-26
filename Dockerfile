@@ -10,6 +10,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
 RUN npm run build
+RUN mkdir -p public
 
 FROM node:22-alpine AS runner
 WORKDIR /app
