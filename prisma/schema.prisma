@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UploadStatus {
+  PROCESSING
+  PREVIEW_READY
+  COMPLETED
+  FAILED
+}
+
+enum ProcessedOrderAction {
+  MARK_PAID
+  SKIP
+  IGNORE
+}
+
+enum ProcessedOrderResult {
+  PENDING
+  SUCCESS
+  SKIPPED
+  FAILED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  passwordHash  String
+  createdAt     DateTime   @default(now())
+  store         Store?
+  auditLogs     AuditLog[]
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Store {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  shopDomain           String    @unique
+  shopifyShopId         String?
+  encryptedAccessToken String?
+  installedAt          DateTime?
+  disconnectedAt       DateTime?
+  lastConnectionCheck  DateTime?
+  createdAt            DateTime  @default(now())
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploads              Upload[]
+}
+
+model Upload {
+  id          String           @id @default(cuid())
+  storeId     String
+  filename    String
+  uploadedAt  DateTime         @default(now())
+  processedAt DateTime?
+  status      UploadStatus     @default(PROCESSING)
+  ordersFound Int              @default(0)
+  ordersUpdated Int            @default(0)
+  ordersSkipped Int            @default(0)
+  ordersFailed Int             @default(0)
+  store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orders      ProcessedOrder[]
+}
+
+model ProcessedOrder {
+  id             String               @id @default(cuid())
+  uploadId       String
+  orderNumber    String
+  shopifyOrderId  String?
+  shopifyStatus   String?
+  paymentStatus   String?
+  action         ProcessedOrderAction
+  result         ProcessedOrderResult @default(PENDING)
+  message        String?
+  createdAt      DateTime             @default(now())
+  upload         Upload               @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
